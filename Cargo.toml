@@ -1,0 +1,37 @@
+[package]
+name = "encrypt-stuff"
+version = "0.1.0"
+edition = "2021"
+description = "Encrypt serializable data"
+authors = ["Ben Pawlowski ben@pepski.com"]
+license = "MIT"
+repository = "https://github.com/BenPski/encrypt-stuff"
+readme = "README.md"
+exclude = [".github"]
+keywords = ["encryption", "serialization"]
+categories = ["cryptography"]
+rust-version = "1.65"
+
+[dependencies]
+aead = { version = "0.5.2", features = ["alloc", "getrandom"] }
+aes-gcm = { version = "0.10.3", optional = true, default-features = false }
+aes-gcm-siv = { version = "0.11.1", default-features = false, optional = true }
+bitcode = { version = "0.6.3", features = ["serde"] }
+boring-derive = "0.1.1"
+chacha20poly1305 = { version = "0.10.1", optional = true, default-features = false }
+secrecy = { version = "0.8.0", features = ["serde"] }
+serde = { version = "1.0.208", features = ["derive"] }
+thiserror = "1.0.63"
+
+[features]
+chacha20poly1305 = ["dep:chacha20poly1305"]
+chacha8poly1305 = ["chacha20poly1305/reduced-round"]
+chacha12poly1305 = ["chacha20poly1305/reduced-round"]
+xchacha20poly1305 = ["dep:chacha20poly1305"]
+xchacha8poly1305 = ["chacha20poly1305/reduced-round"]
+xchacha12poly1305 = ["chacha20poly1305/reduced-round"]
+aes256gcm = ["aes-gcm/aes"]
+aes128gcm = ["aes-gcm/aes"]
+aes256gcmsiv = ["aes-gcm-siv/aes"]
+aes128gcmsiv = ["aes-gcm-siv/aes"]
+
