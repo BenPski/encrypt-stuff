@@ -3,7 +3,7 @@ use secrecy::{ExposeSecret, Secret, SecretVec, Zeroize};
 use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
 
-use crate::error::EncryptionError;
+use super::{decode::Decoder, encode::Encoder};
 
 /// represents the encrypted form of the data, can be serialized and deserialized
 #[derive(Debug, Serialize, Deserialize)]
@@ -31,49 +31,44 @@ pub struct DecryptedExposed<Data> {
     #[serde(skip)]
     phantom: PhantomData<Data>,
 }
-
-impl<'a, Data> Decrypted<Data>
-where
-    Data: Deserialize<'a> + Zeroize,
-{
-    pub fn deserialize(&'a self) -> Result<Secret<Data>, bitcode::Error> {
-        bitcode::deserialize(self.data.expose_secret()).map(|res| Secret::new(res))
-    }
-}
-
-impl<'a, Data> DecryptedExposed<Data>
-where
-    Data: Deserialize<'a>,
-{
-    pub fn deserialize(&'a self) -> Result<Data, bitcode::Error> {
-        bitcode::deserialize(&self.data)
-    }
-}
-
-impl<'de, Data> Encrypted<Data>
-where
-    Data: Serialize + Deserialize<'de>,
-{
-    pub fn encode(&self) -> Result<Vec<u8>, bitcode::Error> {
-        bitcode::serialize(&self)
-    }
-
-    pub fn decode(bytes: &[u8]) -> Result<Self, bitcode::Error> {
-        bitcode::deserialize(bytes)
-    }
-}
+type GenericErr = Box<(dyn std::error::Error)>;
 
 /// general trait for encrypting serializable data
-pub trait Encryption {
+pub trait Encryption<Scheme>
+where
+    Scheme: Encoder + Decoder,
+{
     type Cipher: Aead + AeadCore + KeyInit + KeySizeUser;
+    // type Scheme: Encoder + Decoder;
+
+    fn encode<Data>(data: &Encrypted<Data>) -> Result<Vec<u8>, GenericErr> {
+        Scheme::encode(data)
+    }
+
+    fn decode<Data>(data: &[u8]) -> Result<Encrypted<Data>, Box<(dyn std::error::Error)>> {
+        Scheme::decode(data)
+    }
+
+    fn extract<'de, Data: Deserialize<'de> + Zeroize>(
+        decrypted: &'de Decrypted<Data>,
+    ) -> Result<Secret<Data>, Box<(dyn std::error::Error)>> {
+        Scheme::decode(decrypted.data.expose_secret()).map(|x| Secret::new(x))
+    }
+
+    fn extract_exposed<'de, Data: Deserialize<'de>>(
+        decrypted: &'de DecryptedExposed<Data>,
+    ) -> Result<Data, Box<(dyn std::error::Error)>> {
+        Scheme::decode(&decrypted.data)
+    }
+
     /// convert the data to it's serialized form and then encypt it using `[Cipher]`
     fn encrypt<Data: Serialize>(
         data: &Data,
         key: &GenericArray<u8, <Self::Cipher as KeySizeUser>::KeySize>,
-    ) -> Result<Encrypted<Data>, EncryptionError> {
+    ) -> Result<Encrypted<Data>, GenericErr> {
         let cipher = Self::Cipher::new(key);
         let nonce = Self::Cipher::generate_nonce(&mut OsRng);
-        let serialized = bitcode::serialize(data)?;
+        let serialized = Scheme::encode(data)?;
         let encrypted = cipher.encrypt(&nonce, serialized.as_ref())?;
         Ok(Encrypted {
             nonce: nonce.to_vec(),
@@ -87,7 +82,7 @@ pub trait Encryption {
     fn decrypt<Data>(
         encrypted: &Encrypted<Data>,
         key: &GenericArray<u8, <Self::Cipher as KeySizeUser>::KeySize>,
-    ) -> Result<Decrypted<Data>, EncryptionError> {
+    ) -> Result<Decrypted<Data>, GenericErr> {
         let cipher = Self::Cipher::new(key);
         let data = cipher.decrypt(
             GenericArray::from_slice(encrypted.nonce.as_ref()),
@@ -103,7 +98,7 @@ pub trait Encryption {
     fn decrypt_exposed<Data>(
         encrypted: &Encrypted<Data>,
         key: &GenericArray<u8, <Self::Cipher as KeySizeUser>::KeySize>,
-    ) -> Result<DecryptedExposed<Data>, EncryptionError> {
+    ) -> Result<DecryptedExposed<Data>, GenericErr> {
         let cipher = Self::Cipher::new(key);
         let data = cipher.decrypt(
             GenericArray::from_slice(encrypted.nonce.as_ref()),
