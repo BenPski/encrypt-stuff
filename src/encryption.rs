@@ -37,7 +37,7 @@ where
     Data: Deserialize<'a> + Zeroize,
 {
     pub fn deserialize(&'a self) -> Result<Secret<Data>, bitcode::Error> {
-        bitcode::deserialize(&self.data.expose_secret()).map(|res| Secret::new(res))
+        bitcode::deserialize(self.data.expose_secret()).map(|res| Secret::new(res))
     }
 }
 
