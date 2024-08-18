@@ -3,7 +3,7 @@ use secrecy::{ExposeSecret, Secret, SecretVec, Zeroize};
 use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
 
-use super::{decode::Decoder, encode::Encoder};
+use super::{decode::Decoder, encode::Encoder, schemes::bitcode::Bitcode};
 
 /// represents the encrypted form of the data, can be serialized and deserialized
 #[derive(Debug, Serialize, Deserialize)]
@@ -34,7 +34,7 @@ pub struct DecryptedExposed<Data> {
 type GenericErr = Box<(dyn std::error::Error)>;
 
 /// general trait for encrypting serializable data
-pub trait Encryption<Scheme>
+pub trait Encryption<Scheme = Bitcode>
 where
     Scheme: Encoder + Decoder,
 {
