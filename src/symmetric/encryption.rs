@@ -1,4 +1,4 @@
-use aead::{generic_array::GenericArray, Aead, AeadCore, KeyInit, KeySizeUser, OsRng};
+use aead::{generic_array::GenericArray, Aead, AeadCore, Key, KeyInit, KeySizeUser, OsRng};
 use secrecy::{ExposeSecret, Secret, SecretVec, Zeroize};
 use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
@@ -64,7 +64,7 @@ where
     /// convert the data to it's serialized form and then encypt it using `[Cipher]`
     fn encrypt<Data: Serialize>(
         data: &Data,
-        key: &GenericArray<u8, <Self::Cipher as KeySizeUser>::KeySize>,
+        key: &Key<Self::Cipher>,
     ) -> Result<Encrypted<Data>, GenericErr> {
         let cipher = Self::Cipher::new(key);
         let nonce = Self::Cipher::generate_nonce(&mut OsRng);

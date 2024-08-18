@@ -9,3 +9,5 @@ pub mod schemes;
 
 #[cfg(feature = "default")]
 pub type DefaultScheme = Aes256Gcm<Bitcode>;
+
+pub use aead::Key;
