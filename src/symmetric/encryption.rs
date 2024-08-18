@@ -3,7 +3,7 @@ use secrecy::{ExposeSecret, Secret, SecretVec, Zeroize};
 use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
 
-use super::{decode::Decoder, encode::Encoder, schemes::bitcode::Bitcode};
+use crate::serialization::{decode::Decoder, encode::Encoder};
 
 /// represents the encrypted form of the data, can be serialized and deserialized
 #[derive(Debug, Serialize, Deserialize)]
@@ -34,31 +34,28 @@ pub struct DecryptedExposed<Data> {
 type GenericErr = Box<(dyn std::error::Error)>;
 
 /// general trait for encrypting serializable data
-pub trait Encryption<Scheme = Bitcode>
-where
-    Scheme: Encoder + Decoder,
-{
+pub trait Encryption {
     type Cipher: Aead + AeadCore + KeyInit + KeySizeUser;
-    // type Scheme: Encoder + Decoder;
+    type Scheme: Encoder + Decoder;
 
     fn encode<Data>(data: &Encrypted<Data>) -> Result<Vec<u8>, GenericErr> {
-        Scheme::encode(data)
+        Self::Scheme::encode(data)
     }
 
     fn decode<Data>(data: &[u8]) -> Result<Encrypted<Data>, Box<(dyn std::error::Error)>> {
-        Scheme::decode(data)
+        Self::Scheme::decode(data)
     }
 
     fn extract<'de, Data: Deserialize<'de> + Zeroize>(
         decrypted: &'de Decrypted<Data>,
     ) -> Result<Secret<Data>, Box<(dyn std::error::Error)>> {
-        Scheme::decode(decrypted.data.expose_secret()).map(|x| Secret::new(x))
+        Self::Scheme::decode(decrypted.data.expose_secret()).map(|x| Secret::new(x))
     }
 
     fn extract_exposed<'de, Data: Deserialize<'de>>(
         decrypted: &'de DecryptedExposed<Data>,
     ) -> Result<Data, Box<(dyn std::error::Error)>> {
-        Scheme::decode(&decrypted.data)
+        Self::Scheme::decode(&decrypted.data)
     }
 
     /// convert the data to it's serialized form and then encypt it using `[Cipher]`
@@ -68,7 +65,7 @@ where
     ) -> Result<Encrypted<Data>, GenericErr> {
         let cipher = Self::Cipher::new(key);
         let nonce = Self::Cipher::generate_nonce(&mut OsRng);
-        let serialized = Scheme::encode(data)?;
+        let serialized = Self::Scheme::encode(data)?;
         let encrypted = cipher.encrypt(&nonce, serialized.as_ref())?;
         Ok(Encrypted {
             nonce: nonce.to_vec(),
