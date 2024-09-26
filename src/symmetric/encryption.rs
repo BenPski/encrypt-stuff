@@ -1,6 +1,6 @@
 use aead::{generic_array::GenericArray, Aead, AeadCore, Key, KeyInit, KeySizeUser, OsRng};
 use secrecy::{ExposeSecret, Secret, SecretVec, Zeroize};
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::marker::PhantomData;
 
 use crate::serialization::{decode::Decoder, encode::Encoder};
@@ -74,6 +74,35 @@ pub trait Encryption {
         })
     }
 
+    /// take ownership of encrypted value and directly decrypt it without needing
+    /// a separate decode step
+    fn into_data<Data: DeserializeOwned + Zeroize>(
+        encrypted: Encrypted<Data>,
+        key: &GenericArray<u8, <Self::Cipher as KeySizeUser>::KeySize>,
+    ) -> Result<Secret<Data>, GenericErr> {
+        let cipher = Self::Cipher::new(key);
+        let data = cipher.decrypt(
+            GenericArray::from_slice(encrypted.nonce.as_ref()),
+            encrypted.data.as_ref(),
+        )?;
+        let decoded = Self::Scheme::decode_owned(data)?;
+        Ok(Secret::new(decoded))
+    }
+
+    /// take ownership of encrypted value and directly decrypt it without needing
+    /// a separate decode step
+    /// doesn't return a secret value
+    fn into_data_exposed<Data: DeserializeOwned>(
+        encrypted: Encrypted<Data>,
+        key: &GenericArray<u8, <Self::Cipher as KeySizeUser>::KeySize>,
+    ) -> Result<Data, GenericErr> {
+        let cipher = Self::Cipher::new(key);
+        let data = cipher.decrypt(
+            GenericArray::from_slice(encrypted.nonce.as_ref()),
+            encrypted.data.as_ref(),
+        )?;
+        Self::Scheme::decode_owned(data)
+    }
     /// decrypt the data to it's serialized form, pre-emptively wraps data in
     /// a [Secret]
     fn decrypt<Data>(

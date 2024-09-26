@@ -19,4 +19,10 @@ impl Decoder for Bincode {
         let res = bincode::deserialize(input)?;
         Ok(res)
     }
+    fn decode_owned<T: serde::de::DeserializeOwned>(
+        input: Vec<u8>,
+    ) -> Result<T, Box<dyn std::error::Error>> {
+        let res = bincode::deserialize(&input)?;
+        Ok(res)
+    }
 }

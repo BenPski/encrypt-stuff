@@ -19,4 +19,10 @@ impl Decoder for Bitcode {
         let res = bitcode::deserialize(input)?;
         Ok(res)
     }
+    fn decode_owned<T: serde::de::DeserializeOwned>(
+        input: Vec<u8>,
+    ) -> Result<T, Box<dyn std::error::Error>> {
+        let res = bitcode::deserialize(&input)?;
+        Ok(res)
+    }
 }
